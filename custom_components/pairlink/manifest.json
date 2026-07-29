@@ -1,0 +1,24 @@
+{
+  "domain": "pairlink",
+  "name": "PairLink",
+  "bluetooth": [
+    {
+      "connectable": true,
+      "local_name": "connected-switch*"
+    },
+    {
+      "connectable": true,
+      "manufacturer_id": 65535,
+      "manufacturer_data_start": [192, 255]
+    }
+  ],
+  "codeowners": ["@nunnun"],
+  "config_flow": true,
+  "dependencies": ["bluetooth_adapters"],
+  "documentation": "https://github.com/nunnun/ha-pairlink",
+  "integration_type": "device",
+  "iot_class": "local_push",
+  "issue_tracker": "https://github.com/nunnun/ha-pairlink/issues",
+  "requirements": [],
+  "version": "0.1.0"
+}

@@ -1,0 +1,65 @@
+{
+  "title": "PairLink",
+  "config": {
+    "flow_title": "{name}",
+    "step": {
+      "user": {
+        "title": "PairLinkスイッチを選択",
+        "description": "追加するスイッチを選択してください。",
+        "data": {
+          "address": "スイッチ"
+        }
+      },
+      "bluetooth_confirm": {
+        "title": "{name}を追加",
+        "description": "このスイッチをHome Assistantへ登録します。"
+      },
+      "registration_retry": {
+        "title": "登録を完了できませんでした",
+        "description": "スイッチが近くにあることを確認し、送信して再試行してください。"
+      },
+      "reauth_confirm": {
+        "title": "{name}の認証情報を更新",
+        "description": "このスイッチから新しい認証情報を取得します。"
+      }
+    },
+    "progress": {
+      "wait_for_registration": "対象スイッチの登録ボタン2を、LEDが1回点灯するまで押し続けてから離してください。"
+    },
+    "error": {
+      "cannot_connect": "スイッチへ接続できません。",
+      "invalid_auth": "取得した認証情報をスイッチが受理しませんでした。",
+      "invalid_registration": "登録広告が不完全または不正です。",
+      "registration_timeout": "2分以内に登録広告を受信できませんでした。",
+      "unknown": "予期しないエラーが発生しました。"
+    },
+    "abort": {
+      "already_configured": "このスイッチはすでに設定されています。",
+      "invalid_stored_configuration": "保存済みのPairLink設定が不正です。",
+      "no_devices_found": "未設定のPairLinkスイッチが見つかりません。",
+      "not_connectable": "接続できないBluetooth scannerからのみ発見されました。",
+      "not_supported": "対応するPairLinkスイッチの広告ではありません。",
+      "reauth_successful": "PairLinkの認証情報を更新しました。"
+    }
+  },
+  "entity": {
+    "event": {
+      "button": {
+        "name": "ボタン"
+      }
+    },
+    "sensor": {
+      "signal_strength": {
+        "name": "受信信号強度"
+      }
+    }
+  },
+  "exceptions": {
+    "invalid_configuration": {
+      "message": "保存済みのPairLink設定が不正です。"
+    },
+    "no_connectable_adapter": {
+      "message": "接続可能なBluetooth adapterまたはproxyがありません。"
+    }
+  }
+}

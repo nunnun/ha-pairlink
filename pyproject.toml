@@ -1,0 +1,52 @@
+[build-system]
+requires = ["setuptools>=80"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ha-pairlink"
+version = "0.1.0"
+description = "Self-contained PairLink Bluetooth integration for Home Assistant"
+readme = "README.md"
+requires-python = ">=3.14.2"
+license = "MIT"
+authors = [{ name = "Hirotaka Nakajima" }]
+dependencies = []
+
+[project.optional-dependencies]
+test = [
+  "aioesphomeapi==45.6.1",
+  "aiousbwatcher==1.1.2",
+  "coverage==7.14.1",
+  "pytest==9.0.3",
+  "pytest-cov==7.1.0",
+  "pytest-homeassistant-custom-component==0.13.348",
+  "ruff>=0.12",
+  "serialx==1.8.2",
+]
+
+[tool.setuptools.packages.find]
+include = ["custom_components*"]
+namespaces = true
+
+[tool.pytest.ini_options]
+addopts = "--strict-markers --cov=custom_components.pairlink --cov-report=term-missing"
+asyncio_mode = "auto"
+pythonpath = ["."]
+testpaths = ["tests"]
+
+[tool.coverage.run]
+branch = true
+
+[tool.coverage.report]
+exclude_also = [
+  "if TYPE_CHECKING:",
+  "raise NotImplementedError",
+]
+
+[tool.ruff]
+target-version = "py314"
+line-length = 88
+extend-exclude = [".venv314"]
+
+[tool.ruff.lint]
+select = ["ASYNC", "B", "E", "F", "I", "SIM", "UP"]

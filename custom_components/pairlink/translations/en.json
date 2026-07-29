@@ -1,0 +1,65 @@
+{
+  "title": "PairLink",
+  "config": {
+    "flow_title": "{name}",
+    "step": {
+      "user": {
+        "title": "Select a PairLink switch",
+        "description": "Select a visible switch to add.",
+        "data": {
+          "address": "Switch"
+        }
+      },
+      "bluetooth_confirm": {
+        "title": "Add {name}",
+        "description": "Continue to register this switch with Home Assistant."
+      },
+      "registration_retry": {
+        "title": "Registration was not completed",
+        "description": "Make sure the switch is nearby, then submit to try again."
+      },
+      "reauth_confirm": {
+        "title": "Refresh {name}",
+        "description": "Continue to capture fresh credentials for this switch."
+      }
+    },
+    "progress": {
+      "wait_for_registration": "Press and hold registration button 2 on the target switch until the LED lights once, then release it."
+    },
+    "error": {
+      "cannot_connect": "Unable to connect to the switch.",
+      "invalid_auth": "The switch did not accept the captured credentials.",
+      "invalid_registration": "The registration advertisement was incomplete or invalid.",
+      "registration_timeout": "The registration advertisement was not received within two minutes.",
+      "unknown": "An unexpected error occurred."
+    },
+    "abort": {
+      "already_configured": "This switch is already configured.",
+      "invalid_stored_configuration": "The stored PairLink configuration is invalid.",
+      "no_devices_found": "No unconfigured PairLink switches were found.",
+      "not_connectable": "This switch was only seen by a Bluetooth scanner that cannot make connections.",
+      "not_supported": "The Bluetooth advertisement is not a supported PairLink switch.",
+      "reauth_successful": "PairLink credentials were refreshed successfully."
+    }
+  },
+  "entity": {
+    "event": {
+      "button": {
+        "name": "Button"
+      }
+    },
+    "sensor": {
+      "signal_strength": {
+        "name": "Signal strength"
+      }
+    }
+  },
+  "exceptions": {
+    "invalid_configuration": {
+      "message": "The stored PairLink configuration is invalid."
+    },
+    "no_connectable_adapter": {
+      "message": "No connectable Bluetooth adapter or proxy is available."
+    }
+  }
+}
