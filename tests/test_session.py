@@ -64,6 +64,9 @@ class _FakeClient:
         self.is_connected = False
         self.disconnected = True
 
+    async def read_gatt_char(self, _uuid) -> bytearray:
+        return bytearray(b"connected-switch")
+
 
 async def test_connection_performs_full_handshake(
     monkeypatch: pytest.MonkeyPatch,
@@ -95,6 +98,20 @@ async def test_connection_performs_full_handshake(
     await connection.async_close()
     assert client.stopped
     assert client.disconnected
+
+
+async def test_connection_health_check_reads_over_the_active_gatt_path(
+    credentials: PairLinkCredentials,
+) -> None:
+    """A successful health check is more than a WebSocket heartbeat."""
+    client = _FakeClient()
+    connection = PairLinkConnection(
+        credentials,
+        PairLinkCodec(credentials.home_id, credentials.password),
+    )
+    connection._client = client
+
+    await connection.async_health_check()
 
 
 async def test_login_wait_ends_immediately_on_disconnect(
@@ -389,6 +406,78 @@ async def test_sessions_serialize_connection_and_authentication(
     for task in tasks:
         task.cancel()
     await asyncio.gather(*tasks, return_exceptions=True)
+
+
+async def test_session_resolves_a_fresh_ap_route_after_disconnect(
+    monkeypatch: pytest.MonkeyPatch,
+    credentials: PairLinkCredentials,
+) -> None:
+    """AP failover reuses one switch session and resolves a new BLEDevice route."""
+    routes = [SimpleNamespace(source="ap-a"), SimpleNamespace(source="ap-b")]
+    resolved: list[str] = []
+
+    def _resolve(*_args, **_kwargs):
+        return routes[len(resolved)]
+
+    class _RouteConnection:
+        dropped_notifications = 0
+
+        def __init__(self, *_args) -> None:
+            pass
+
+        async def async_connect_and_authenticate(self, device) -> None:
+            resolved.append(device.source)
+
+        async def async_close(self) -> None:
+            pass
+
+    session = PairLinkSession(
+        MagicMock(),
+        MagicMock(entry_id="entry-a"),
+        credentials,
+    )
+
+    async def _disconnect(_connection) -> None:
+        if len(resolved) == 2:
+            session._stopping = True
+        raise PairLinkDisconnectedError
+
+    monkeypatch.setattr(
+        "custom_components.pairlink.session.bluetooth.async_ble_device_from_address",
+        _resolve,
+    )
+    monkeypatch.setattr(
+        "custom_components.pairlink.session.PairLinkConnection",
+        _RouteConnection,
+    )
+    session._async_process_notifications = _disconnect
+    session._async_backoff = AsyncMock()
+
+    await session._async_connection_loop()
+
+    assert resolved == ["ap-a", "ap-b"]
+
+
+async def test_failed_health_check_ends_the_notification_session(
+    monkeypatch: pytest.MonkeyPatch,
+    credentials: PairLinkCredentials,
+) -> None:
+    """A silent Aruba disconnect is surfaced instead of waiting forever."""
+    session = PairLinkSession(
+        MagicMock(),
+        MagicMock(entry_id="entry-a"),
+        credentials,
+    )
+    connection = SimpleNamespace(
+        is_connected=True,
+        async_health_check=AsyncMock(side_effect=RuntimeError("not connected")),
+    )
+    monkeypatch.setattr("custom_components.pairlink.session.HEALTH_CHECK_INTERVAL", 0)
+
+    with pytest.raises(RuntimeError, match="not connected"):
+        await session._async_health_check_loop(connection)
+
+    assert session.diagnostics.health_check_failure_count == 1
 
 
 async def test_stop_cancels_task_and_closes_connection(

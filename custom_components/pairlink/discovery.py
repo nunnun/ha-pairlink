@@ -96,6 +96,11 @@ def remote_id_to_mac(remote_id: bytes) -> str:
     return ":".join(f"{value:02X}" for value in reversed(remote_id))
 
 
+def switch_unique_id(remote_id: bytes) -> str:
+    """Return the AP-independent canonical identity of one physical switch."""
+    return remote_id_to_mac(remote_id)
+
+
 def display_name(remote_id: bytes) -> str:
     """Return a privacy-conscious display name for a switch."""
     mac = remote_id_to_mac(remote_id)

@@ -17,6 +17,7 @@ from homeassistant.config_entries import (
 )
 from homeassistant.const import CONF_ADDRESS
 
+from .aruba_compat import enable_aruba_uuid_compat
 from .const import (
     CONF_LIGHT_ID,
     DOMAIN,
@@ -27,6 +28,7 @@ from .discovery import (
     display_name,
     find_advertisement,
     generate_light_id,
+    switch_unique_id,
 )
 from .models import PairLinkAdvertisement, PairLinkCredentials
 from .session import (
@@ -60,8 +62,8 @@ class _RegistrationOutcome:
 class PairLinkConfigFlow(ConfigFlow, domain=DOMAIN):
     """Handle PairLink setup and reauthentication."""
 
-    VERSION = 1
-    MINOR_VERSION = 1
+    VERSION = 2
+    MINOR_VERSION = 0
 
     def __init__(self) -> None:
         """Initialize transient flow state."""
@@ -116,6 +118,12 @@ class PairLinkConfigFlow(ConfigFlow, domain=DOMAIN):
             for entry in self.hass.config_entries.async_entries(DOMAIN)
             if entry.unique_id is not None
         }
+        configured_remote_ids = {
+            entry.data.get("remote_id")
+            for entry in self.hass.config_entries.async_entries(DOMAIN)
+        }
+        discovered_switch_ids: set[str] = set()
+        self._discovered.clear()
         for service_info in bluetooth.async_discovered_service_info(
             self.hass, connectable=True
         ):
@@ -123,9 +131,14 @@ class PairLinkConfigFlow(ConfigFlow, domain=DOMAIN):
             if (
                 advertisement is None
                 or advertisement.remote_id is None
-                or advertisement.remote_id.hex() in configured_ids
+                or switch_unique_id(advertisement.remote_id) in configured_ids
+                or advertisement.remote_id.hex() in configured_remote_ids
             ):
                 continue
+            switch_id = switch_unique_id(advertisement.remote_id)
+            if switch_id in discovered_switch_ids:
+                continue
+            discovered_switch_ids.add(switch_id)
             self._discovered[service_info.address] = service_info
 
         if not self._discovered:
@@ -183,7 +196,7 @@ class PairLinkConfigFlow(ConfigFlow, domain=DOMAIN):
         self._registration_task = None
         self._initial_registration = None
 
-        await self.async_set_unique_id(credentials.remote_id.hex())
+        await self.async_set_unique_id(switch_unique_id(credentials.remote_id))
         if self.source == SOURCE_REAUTH:
             self._abort_if_unique_id_mismatch()
             return self.async_update_and_abort(
@@ -251,7 +264,7 @@ class PairLinkConfigFlow(ConfigFlow, domain=DOMAIN):
         if advertisement is None or advertisement.remote_id is None:
             return False
         remote_id = advertisement.remote_id
-        await self.async_set_unique_id(remote_id.hex())
+        await self.async_set_unique_id(switch_unique_id(remote_id))
         name = display_name(remote_id)
         self._target = _FlowTarget(
             address=service_info.address,
@@ -331,6 +344,7 @@ class PairLinkConfigFlow(ConfigFlow, domain=DOMAIN):
 
         for attempt in range(_REGISTRATION_VALIDATION_ATTEMPTS):
             try:
+                enable_aruba_uuid_compat()
                 await async_validate_credentials(device, credentials)
             except PairLinkAuthenticationError, PairLinkLoginTimeout:
                 return _RegistrationOutcome(error="invalid_auth")

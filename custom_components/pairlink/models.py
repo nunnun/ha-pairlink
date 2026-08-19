@@ -187,8 +187,11 @@ class SessionDiagnostics:
     rssi: int | None = None
     last_ready_at: datetime | None = None
     last_event_at: datetime | None = None
+    last_health_check_at: datetime | None = None
     connection_attempts: int = 0
     disconnect_count: int = 0
+    health_check_count: int = 0
+    health_check_failure_count: int = 0
     decoded_event_count: int = 0
     duplicate_count: int = 0
     unknown_packet_count: int = 0
@@ -202,8 +205,11 @@ class SessionDiagnostics:
             "rssi": self.rssi,
             "last_ready_at": _isoformat(self.last_ready_at),
             "last_event_at": _isoformat(self.last_event_at),
+            "last_health_check_at": _isoformat(self.last_health_check_at),
             "connection_attempts": self.connection_attempts,
             "disconnect_count": self.disconnect_count,
+            "health_check_count": self.health_check_count,
+            "health_check_failure_count": self.health_check_failure_count,
             "decoded_event_count": self.decoded_event_count,
             "duplicate_count": self.duplicate_count,
             "unknown_packet_count": self.unknown_packet_count,

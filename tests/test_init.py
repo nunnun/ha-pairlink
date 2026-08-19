@@ -8,7 +8,11 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from homeassistant.exceptions import ConfigEntryNotReady
 
-from custom_components.pairlink import async_setup_entry, async_unload_entry
+from custom_components.pairlink import (
+    async_migrate_entry,
+    async_setup_entry,
+    async_unload_entry,
+)
 
 from .test_models import ENTRY_DATA
 
@@ -102,3 +106,18 @@ async def test_unload_always_stops_session() -> None:
 
     assert await async_unload_entry(hass, entry)
     session.async_stop.assert_awaited_once()
+
+
+async def test_migration_changes_entry_identity_to_canonical_switch_mac() -> None:
+    """Legacy entries remain the same switch when Aruba AP routes change."""
+    hass = MagicMock()
+    entry = MagicMock(data=ENTRY_DATA, version=1)
+
+    assert await async_migrate_entry(hass, entry)
+
+    hass.config_entries.async_update_entry.assert_called_once_with(
+        entry,
+        unique_id="12:34:56:78:9A:BC",
+        version=2,
+        minor_version=0,
+    )

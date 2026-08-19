@@ -26,6 +26,9 @@ PairLink電球の直接制御にはHome Assistantの公式Bluetooth API外のBlu
 初期リリースには、dedup windowを変更するOptions Flow、未知commandのentity化、
 3台以上の動作保証は含めない。
 
+`0.2.0`ではAruba APをconnectable proxyとして追加し、複数AP経路、native 16-bit UUID、
+60秒GATT health checkに対応する。
+
 実装基準はHome Assistant Core 2026.7以降とする。使用するBluetooth APIとConfig Entry
 更新方式をこのversionで固定し、`hacs.json`にもminimum versionを記載する。
 
@@ -123,7 +126,8 @@ Config Flow側で全manufacturer valueを再parseし、完全な`type 0x05`ま�
 
 ### 3.4 現在addressの追従
 
-Config Entryのunique IDは`remote_id.hex()`とし、addressは接続先情報として扱う。
+Config Entryのunique IDは`remote_id`から復元した正規switch MACとし、addressは接続先情報
+として扱う。旧`remote_id.hex()` identityはversion 2 migrationで正規MACへ更新する。
 同じ`remote_id`を新しいaddressで再発見した場合は、既存entryのaddressを更新して
 flowをabortする。Device RegistryのBluetooth connectionもentry reload時に追従させる。
 
@@ -177,7 +181,7 @@ custom integrationなので`strings.json`は作らず、英語・日本語とも
 
 ```text
 domain:            pairlink
-version:           0.1.0
+version:           0.2.0
 integration_type:  device
 config_flow:       true
 dependencies:      [bluetooth_adapters]
@@ -264,7 +268,7 @@ Discovery flow:
 ```text
 async_step_bluetooth
   -> parse / connectable確認
-  -> unique_id = remote_id.hex()
+  -> unique_id = switch_unique_id(remote_id)
   -> 既存entryならaddress更新してabort
   -> async_step_bluetooth_confirm
   -> async_step_registration(progress)

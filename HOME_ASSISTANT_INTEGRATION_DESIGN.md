@@ -84,7 +84,9 @@ name:        PairLink switch
 model:       PairLink-compatible switch
 ```
 
-`remote_id`を主識別子とし、BLE addressは接続情報として扱う。現在の実機では
+`remote_id`から復元した正規switch MACをConfig Entryのunique IDとし、Device/Entityの
+内部identifierは既存Entityとの互換性のため`remote_id_hex`を維持する。両者は1対1であり、
+どちらもAP sourceを含まない。BLE addressは接続情報として扱う。現在の実機では
 `remote_id`から復元したMACとBLE addressが一致したが、将来のaddress randomizationを
 考慮して同一とは決め打ちしない。
 
@@ -163,6 +165,34 @@ Bluetooth Managerが返すconnectableな`BLEDevice`として扱う。
 listen-only proxyはGATT接続できないため対象外とする。local adapterからproxyへの
 failoverを含む実機acceptanceは、対応機材を導入した時点で追加する。
 
+### 4.2 Aruba AP経路と複数AP
+
+Aruba APは`aruba_ble_proxy`がAP reporter MACごとのconnectable scannerとしてBluetooth
+Managerへ登録する。PairLink integrationはArubaのruntimeやAP一覧を直接参照しない。
+
+```text
+AP-A scanner ─┐
+              ├─ Home Assistant Bluetooth Manager ─ PairLinkSession(switch MAC)
+AP-B scanner ─┘
+```
+
+- 同じswitch MACを複数APがforwardしてもPairLink Config Entryは1つ
+- AP MACは永続identityへ含めず、接続ごとに解決されるtransport routeに限定
+- active接続が切れた場合、次のattemptで`async_ble_device_from_address()`を再実行
+- Bluetooth ManagerがAP-Bを返せば同じSession/Device/Entityで再接続
+- 接続中のAP間ローミングは行わず、切断を境界とするbreak-before-make
+- APごとのactive connection slotは`aruba_ble_proxy`側が管理
+
+AOS 8.13実機ではidle接続が明示的statusなしに失われたため、PairLinkSessionはREADY中に
+60秒間隔でGAP Device Name (`1800`/`2A00`)をreadする。read成功はWebSocketだけでなく
+AP・BLE link・GATT応答の往復を確認し、keepaliveも兼ねる。失敗は通常のsession failure
+としてcleanupと経路再解決を起動する。
+
+`aruba_ble_proxy 1.1.1`のencoderは16-bit UUIDをBluetooth Base UUIDへ展開するが、AOS
+8.13のGATT cacheはnative 2-byte UUIDを要求した。`aruba_compat.py`はPairLinkとhealth
+checkで使用するUUIDだけを2-byteへ変換する。encoderが既にnative形式を返す版では何も
+変更しない。
+
 ## 5. ディレクトリ構成
 
 domainは会社名を含めず`pairlink`とする。
@@ -176,6 +206,7 @@ custom_components/pairlink/
 ├── models.py
 ├── protocol.py
 ├── discovery.py
+├── aruba_compat.py
 ├── session.py
 ├── event.py
 ├── diagnostics.py
@@ -191,7 +222,8 @@ custom_components/pairlink/
 | `protocol.py` | 純Python AES-128、鍵導出、LOGIN、event暗復号・parse |
 | `discovery.py` | `type 0x05`/`0x0d` manufacturer dataのparse |
 | `config_flow.py` | Bluetooth discovery、登録ボタン案内、credential検証 |
-| `session.py` | 接続、認証、notify、再接続、重複抑制 |
+| `session.py` | 接続、認証、notify、health check、再接続、重複抑制 |
+| `aruba_compat.py` | 影響版Aruba encoderのPairLink UUID限定補正 |
 | `event.py` | PairLink eventをHome Assistant Event Entityへ変換 |
 | `diagnostics.py` | credentialをredactした実行状態 |
 
@@ -206,8 +238,9 @@ custom integrationの翻訳は`strings.json`ではなく、完成した文面を
 {
   "domain": "pairlink",
   "name": "PairLink",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "config_flow": true,
+  "after_dependencies": ["aruba_ble_proxy"],
   "dependencies": ["bluetooth_adapters"],
   "iot_class": "local_push",
   "bluetooth": [
@@ -239,7 +272,7 @@ listen-only Bluetooth proxyからの発見はsetup対象にしない。
 1. connectableな経路があることを確認
 2. manufacturer dataをparse
 3. `remote_id`を取得
-4. `remote_id_hex`をConfig Entryの`unique_id`に設定
+4. `remote_id`から復元した正規switch MACをConfig Entryの`unique_id`に設定
 5. 同じunique IDのentryまたは進行中flowがあれば重複を止める
 6. ユーザー確認画面へ進む
 

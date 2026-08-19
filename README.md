@@ -36,6 +36,28 @@ APIには依存しません。listen-only Bluetooth proxyでは利用できま�
 slotがproxy側に必要です。現時点の実機検証はlocal adapterで完了しており、ESP32 proxy
 経由のhardware acceptanceは今後の検証項目です。
 
+### Aruba APをBluetooth proxyとして使う
+
+AP-635などのAruba IoT radioを使う場合は、先に
+[Aruba BLE Proxy](https://github.com/robertoamd90/aruba-ble-proxy)をHome Assistantへ
+インストールしてActive BLEを有効にします。複数APは同じWebSocket listenerへ接続でき、
+各APが独立したconnectable scannerとしてHome Assistant Bluetooth Managerへ登録されます。
+
+PairLinkはAP MACをDeviceやConfig Entryのidentityに使いません。スイッチのPairLink
+remote IDから復元した正規MACをConfig Entryのunique IDとし、APはその時点の接続経路
+としてだけ扱います。同じスイッチをAP-AとAP-Bが同時に観測してもDeviceは1つです。
+現在の接続が切れた後はBluetooth Managerから経路を再解決するため、AP-Bが選ばれても
+同じEvent Entityのまま復旧します。接続中に無停止でAPを切り替えるmake-before-breakでは
+ありません。
+
+Aruba APが通知なしにidle GATT接続を失うことがあるため、READY中は60秒ごとに標準GAP
+Device Nameをreadします。このreadはリンク確認とkeepaliveを兼ね、失敗時は通常の再接続
+処理へ移ります。
+
+Aruba BLE Proxy 1.1.1がBluetooth SIGの16-bit UUIDを128-bitへ展開して送る問題に対し、
+PairLink 0.2.0は使用するUUIDだけをnative 2-byte形式へ補正します。Aruba側がnative
+16-bit送信へ対応済みなら補正は自動的に無効になります。
+
 ## インストール
 
 ### HACS
@@ -48,6 +70,28 @@ slotがproxy側に必要です。現時点の実機検証はlocal adapterで完�
 
 `custom_components/pairlink`をHome Assistant設定directoryの
 `custom_components/pairlink`へコピーし、Home Assistantを再起動します。
+
+### Gitで更新する場合
+
+このrepositoryは開発用ファイルを含むため、repository全体を直接
+`custom_components/pairlink`へcloneする構成ではありません。設定directoryの外へcloneし、
+integration directoryをsymlinkすると、`git pull`で更新できます。
+
+```bash
+cd /config
+git clone https://github.com/nunnun/ha-pairlink.git ha-pairlink
+mkdir -p custom_components
+ln -s ../ha-pairlink/custom_components/pairlink custom_components/pairlink
+```
+
+更新時は次のコマンドを実行し、Home Assistantを再起動します。
+
+```bash
+git -C /config/ha-pairlink pull --ff-only
+```
+
+既存の`custom_components/pairlink` directoryがある場合は、symlinkを作成する前に
+backupまたは削除を行ってください。
 
 ## スイッチの追加
 

@@ -11,7 +11,9 @@ from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryError, ConfigEntryNotReady
 from homeassistant.helpers import device_registry as dr
 
+from .aruba_compat import enable_aruba_uuid_compat
 from .const import DOMAIN, PLATFORMS
+from .discovery import switch_unique_id
 from .models import PairLinkConfigEntry, PairLinkCredentials
 from .session import PairLinkSession
 
@@ -19,11 +21,36 @@ _LOGGER = logging.getLogger(__name__)
 _CONNECTION_LOCK = "connection_lock"
 
 
+async def async_setup(hass: HomeAssistant, config: dict) -> bool:
+    """Set up transport compatibility before entries or config flows run."""
+    enable_aruba_uuid_compat()
+    return True
+
+
+async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    """Migrate legacy remote-ID entry keys to canonical switch MAC keys."""
+    if entry.version > 2:
+        return False
+    if entry.version < 2:
+        try:
+            credentials = PairLinkCredentials.from_entry_data(dict(entry.data))
+        except ValueError:
+            return False
+        hass.config_entries.async_update_entry(
+            entry,
+            unique_id=switch_unique_id(credentials.remote_id),
+            version=2,
+            minor_version=0,
+        )
+    return True
+
+
 async def async_setup_entry(
     hass: HomeAssistant,
     entry: PairLinkConfigEntry,
 ) -> bool:
     """Set up one PairLink switch without waiting for it to be online."""
+    enable_aruba_uuid_compat()
     try:
         credentials = PairLinkCredentials.from_entry_data(dict(entry.data))
     except ValueError as err:

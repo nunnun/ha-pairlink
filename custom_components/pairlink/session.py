@@ -21,8 +21,10 @@ from homeassistant.util import dt as dt_util
 from .const import (
     COMMAND_TO_EVENT_TYPE,
     DEDUPLICATION_WINDOW,
+    DEVICE_NAME_UUID,
     FFD1_UUID,
     FFD2_UUID,
+    HEALTH_CHECK_INTERVAL,
     LOGIN_RESPONSE_TIMEOUT,
     MAX_LOGIN_TIMEOUTS_BEFORE_REAUTH,
     NOTIFICATION_QUEUE_SIZE,
@@ -139,6 +141,15 @@ class PairLinkConnection:
             return self._backlog.popleft()
         return await self._async_next_live_packet()
 
+    async def async_health_check(self) -> None:
+        """Verify the complete active GATT path with a standard GAP read."""
+        client = self._client
+        if client is None or not client.is_connected:
+            raise PairLinkDisconnectedError("disconnected before health check")
+        await client.read_gatt_char(DEVICE_NAME_UUID)
+        if not client.is_connected:
+            raise PairLinkDisconnectedError("disconnected during health check")
+
     async def _async_next_live_packet(self) -> bytes | None:
         """Wait for a new notification or an active disconnect."""
         if not self.is_connected:
@@ -146,15 +157,18 @@ class PairLinkConnection:
 
         notification_task = asyncio.create_task(self._notifications.get())
         disconnect_task = asyncio.create_task(self._disconnect_event.wait())
-        done, pending = await asyncio.wait(
-            (notification_task, disconnect_task),
-            return_when=asyncio.FIRST_COMPLETED,
-        )
-        for task in pending:
-            task.cancel()
-        for task in pending:
-            with contextlib.suppress(asyncio.CancelledError):
-                await task
+        tasks = {notification_task, disconnect_task}
+        done: set[asyncio.Task] = set()
+        try:
+            done, _pending = await asyncio.wait(
+                tasks,
+                return_when=asyncio.FIRST_COMPLETED,
+            )
+        finally:
+            pending = tasks - done
+            for task in pending:
+                task.cancel()
+            await asyncio.gather(*pending, return_exceptions=True)
         if notification_task in done:
             return notification_task.result()
         return None
@@ -429,12 +443,51 @@ class PairLinkSession:
     async def _async_process_notifications(
         self, connection: PairLinkConnection
     ) -> None:
-        """Process packets until the active connection ends."""
+        """Process packets and actively verify an otherwise idle GATT link."""
+        notification_task = asyncio.create_task(
+            self._async_notification_loop(connection)
+        )
+        health_task = asyncio.create_task(self._async_health_check_loop(connection))
+        tasks = {notification_task, health_task}
+        try:
+            done, pending = await asyncio.wait(
+                tasks,
+                return_when=asyncio.FIRST_COMPLETED,
+            )
+            for task in pending:
+                task.cancel()
+            await asyncio.gather(*pending, return_exceptions=True)
+            for task in done:
+                task.result()
+        finally:
+            for task in tasks:
+                if not task.done():
+                    task.cancel()
+            await asyncio.gather(*tasks, return_exceptions=True)
+
+    async def _async_notification_loop(self, connection: PairLinkConnection) -> None:
+        """Decode notification packets until the active connection ends."""
         while connection.is_connected and not self._stopping:
             packet = await connection.async_next_packet()
             if packet is None:
                 return
             self._process_packet(packet, connection)
+
+    async def _async_health_check_loop(self, connection: PairLinkConnection) -> None:
+        """Keep Aruba links active and detect silent AP-side disconnects."""
+        while connection.is_connected and not self._stopping:
+            await asyncio.sleep(HEALTH_CHECK_INTERVAL)
+            if not connection.is_connected or self._stopping:
+                return
+            try:
+                await connection.async_health_check()
+            except Exception:
+                self.diagnostics.health_check_failure_count += 1
+                self._notify_state()
+                raise
+            self.diagnostics.health_check_count += 1
+            self.diagnostics.last_health_check_at = dt_util.utcnow()
+            self._notify_state()
 
     @callback
     def _process_packet(

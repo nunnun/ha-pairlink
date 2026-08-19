@@ -49,8 +49,8 @@ def _flow(hass, source: str = SOURCE_USER) -> PairLinkConfigFlow:
     return flow
 
 
-async def test_bluetooth_discovery_sets_stable_remote_id(hass) -> None:
-    """Bluetooth discovery uses remote ID rather than current BLE address."""
+async def test_bluetooth_discovery_sets_stable_switch_mac(hass) -> None:
+    """Bluetooth discovery uses switch MAC rather than the current AP source."""
     flow = _flow(hass, SOURCE_BLUETOOTH)
     flow.async_set_unique_id = AsyncMock()
     flow._abort_if_unique_id_configured = MagicMock()
@@ -60,11 +60,48 @@ async def test_bluetooth_discovery_sets_stable_remote_id(hass) -> None:
     assert result["type"] is data_entry_flow.FlowResultType.FORM
     assert result["step_id"] == "bluetooth_confirm"
     assert result["description_placeholders"] == {"name": "PairLink switch 9A:BC"}
-    flow.async_set_unique_id.assert_awaited_once_with("bc9a78563412")
+    flow.async_set_unique_id.assert_awaited_once_with("12:34:56:78:9A:BC")
     flow._abort_if_unique_id_configured.assert_called_once_with(
         updates={"address": "12:34:56:78:9A:BC"},
         reload_on_update=False,
     )
+
+
+async def test_two_aruba_sources_resolve_to_one_switch_identity(hass) -> None:
+    """AP reporter MAC changes cannot create a second PairLink Config Entry."""
+    unique_ids: list[str] = []
+    for source in ("48:00:20:00:00:01", "48:00:20:00:00:02"):
+        flow = _flow(hass, SOURCE_BLUETOOTH)
+
+        async def _set_unique_id(value: str) -> None:
+            unique_ids.append(value)
+
+        flow.async_set_unique_id = _set_unique_id
+        assert await flow._async_set_target_from_service_info(
+            _service_info(IDLE, source=source)
+        )
+
+    assert unique_ids == ["12:34:56:78:9A:BC", "12:34:56:78:9A:BC"]
+
+
+async def test_user_discovery_deduplicates_same_switch_across_routes(
+    hass, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """One physical switch is listed once even when routes expose new addresses."""
+    flow = _flow(hass)
+    first = _service_info(IDLE, address="12:34:56:78:9A:BC", source="48:00:20:00:00:01")
+    second = _service_info(
+        IDLE, address="AA:BB:CC:DD:EE:FF", source="48:00:20:00:00:02"
+    )
+
+    monkeypatch.setattr(
+        "custom_components.pairlink.config_flow.bluetooth.async_discovered_service_info",
+        lambda *_args, **_kwargs: [first, second],
+    )
+    result = await flow.async_step_user()
+
+    assert result["type"] is data_entry_flow.FlowResultType.FORM
+    assert list(flow._discovered) == ["12:34:56:78:9A:BC"]
 
 
 async def test_nonconnectable_discovery_is_rejected(hass) -> None:

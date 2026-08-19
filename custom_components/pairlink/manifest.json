@@ -14,11 +14,12 @@
   ],
   "codeowners": ["@nunnun"],
   "config_flow": true,
+  "after_dependencies": ["aruba_ble_proxy"],
   "dependencies": ["bluetooth_adapters"],
   "documentation": "https://github.com/nunnun/ha-pairlink",
   "integration_type": "device",
   "iot_class": "local_push",
   "issue_tracker": "https://github.com/nunnun/ha-pairlink/issues",
   "requirements": [],
-  "version": "0.1.0"
+  "version": "0.2.0"
 }

@@ -77,3 +77,31 @@ Monitor removal path triggered a kernel Oops in
 `mgmt_remove_adv_monitor_complete`. The test host was returned to standard BlueZ
 mode with active scanning. Passive mode must not be enabled on this host. A full
 power cycle was required to recover the kernel after the Oops.
+
+## 2026-08-19 Aruba AP-635 transport validation
+
+Validation path:
+
+- Aruba AP-635 internal BLE radio
+- Instant AOS `8.13.3.0`, build `96306`
+- Aruba IoT telemetry WebSocket and Active GATT southbound actions
+- Two PairLink switches connected through one AP
+
+Results:
+
+| Check | Result |
+|---|---|
+| Two simultaneous BLE connections | passed |
+| Independent LOGIN and `SESSION_READY` | 2/2 passed |
+| Physical ON/OFF event reception | passed on both switches |
+| Native 2-byte `FFD0`/`FFD1`/`FFD2` actions | required and passed |
+| 5-minute health interval | failed; both links returned `notConnected` at about 301 seconds |
+| 60-second GAP Device Name read | passed beyond the previous failure point on both links |
+| Automatic reconnect during soak | disabled, so successful reads cannot be hidden by application reconnect |
+
+The first idle run lost both AP-side BLE connections without a WebSocket disconnect
+or device status. Consequently, a timer heartbeat alone is not accepted as link
+evidence. The integration performs an actual GATT read every 60 seconds and treats a
+failed read as a disconnect. The long-running two-device soak continued separately
+after integration work began; its final duration and cleanup result are not claimed
+by this entry.
