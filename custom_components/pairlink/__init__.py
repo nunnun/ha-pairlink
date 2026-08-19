@@ -21,7 +21,7 @@ from .session import PairLinkSession
 _LOGGER = logging.getLogger(__name__)
 _CONNECTION_LOCK = "connection_lock"
 
-CONFIG_SCHEMA = cv.empty_config_schema
+CONFIG_SCHEMA = cv.empty_config_schema(DOMAIN)
 
 
 async def async_setup(hass: HomeAssistant, config: dict) -> bool:
