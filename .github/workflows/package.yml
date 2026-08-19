@@ -1,0 +1,21 @@
+name: Package
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build integration archive
+        run: |
+          mkdir -p dist
+          zip -rq "dist/pairlink-ha-${GITHUB_SHA::7}.zip" custom_components/pairlink
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pairlink-ha-${{ github.sha }}
+          path: dist/pairlink-ha-*.zip
+          if-no-files-found: error
+          retention-days: 30

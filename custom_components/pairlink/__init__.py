@@ -9,6 +9,7 @@ from homeassistant.components import bluetooth
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryError, ConfigEntryNotReady
+from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import device_registry as dr
 
 from .aruba_compat import enable_aruba_uuid_compat
@@ -19,6 +20,8 @@ from .session import PairLinkSession
 
 _LOGGER = logging.getLogger(__name__)
 _CONNECTION_LOCK = "connection_lock"
+
+CONFIG_SCHEMA = cv.empty_config_schema
 
 
 async def async_setup(hass: HomeAssistant, config: dict) -> bool:
