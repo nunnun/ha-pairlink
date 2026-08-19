@@ -9,12 +9,18 @@ import pytest
 from homeassistant.exceptions import ConfigEntryNotReady
 
 from custom_components.pairlink import (
+    CONFIG_SCHEMA,
     async_migrate_entry,
     async_setup_entry,
     async_unload_entry,
 )
 
 from .test_models import ENTRY_DATA
+
+
+def test_config_schema_is_registered_for_pairlink_domain() -> None:
+    """Home Assistant can validate the integration's empty YAML schema."""
+    assert CONFIG_SCHEMA({}) == {}
 
 
 async def test_setup_starts_background_session(
